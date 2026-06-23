@@ -309,14 +309,23 @@
     .home-action-btn.food {
       background: var(--orange); color: #fff;
       box-shadow: 0 4px 14px rgba(252,76,2,.4);
-      grid-column: span 2;
-      flex-direction: row; align-items: center; gap: 14px; padding: 20px;
+      flex-direction: column; align-items: flex-start; gap: 6px; padding: 16px;
     }
-    .home-action-btn.food .icon { font-size: 2rem; }
+    .home-action-btn.food .icon { font-size: 1.6rem; }
     .home-action-btn.food .text { flex: 1; }
-    .home-action-btn.food .text strong { display: block; font-size: 1.05rem; }
-    .home-action-btn.food .text span { font-weight: 400; font-size: 0.82rem; opacity: .85; }
+    .home-action-btn.food .text strong { display: block; font-size: 0.92rem; }
+    .home-action-btn.food .text span { font-weight: 400; font-size: 0.75rem; opacity: .85; }
     .home-action-btn.food:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(252,76,2,.5); }
+    .home-action-btn.print {
+      background: var(--surface); color: var(--text);
+      border: 1.5px solid var(--border);
+      box-shadow: var(--shadow-sm);
+      flex-direction: column; align-items: flex-start; gap: 6px; padding: 16px;
+    }
+    .home-action-btn.print .icon { font-size: 1.6rem; }
+    .home-action-btn.print .text strong { display: block; font-size: 0.92rem; }
+    .home-action-btn.print .text span { font-weight: 400; font-size: 0.75rem; color: var(--muted); }
+    .home-action-btn.print:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: var(--orange); }
 
     /* Quick Status Bar */
     .status-bar {
@@ -1220,8 +1229,14 @@
             <strong>Order Food</strong>
             <span>Browse cafeteria menu</span>
           </div>
-          <span style="font-size:1.2rem;opacity:.7">→</span>
         </button>
+        <a class="home-action-btn print" href="reprint.html">
+          <div class="icon">🖨️</div>
+          <div class="text">
+            <strong>Re:Print</strong>
+            <span>Print files via runner</span>
+          </div>
+        </a>
       </div>
     </div>
 
@@ -2727,28 +2742,12 @@ window.openMyOrders = function () {
 
 /* ── Fee calculation helper ────────────────────────────── */
 function computeFees() {
-  const subtotal = cart.reduce((a, b) => a + b.price * b.qty, 0);
-
-  let serviceFee = 0;
-
-  cart.forEach(item => {
-    // Base fee for each item type
-    serviceFee += 15;
-
-    // Additional ₱5 for every quantity beyond the first
-    if (item.qty > 1) {
-      serviceFee += (item.qty - 1) * 3;
-    }
-  });
-
-  const total = subtotal + serviceFee;
-
-  return {
-    subtotal,
-    deliveryFee: serviceFee, // keeps existing UI working
-    extraFee: 0,
-    total
-  };
+  const subtotal    = cart.reduce((a, b) => a + b.price * b.qty, 0);
+  const deliveryFee = 15;
+  // +₱5 if cart has more than 2 distinct item types
+  const extraFee    = cart.length > 2 ? 5 : 0;
+  const total       = subtotal + deliveryFee + extraFee;
+  return { subtotal, deliveryFee, extraFee, total };
 }
 
 function renderCartDrawer() {
