@@ -1250,6 +1250,21 @@ window.confirmDelivery = async function (did) {
     await updateDoc(doc(db, 'deliveryChats', did), { [field]: true });
     showToast('✓ Confirmed', 'success');
 
+    // If the runner is confirming from Re:Lay (rather than using
+    // "Mark as Delivered" in runner.html), sync the order status too
+    // so the order moves off the runner's Active board.
+    if (!iAmCustomer) {
+      try {
+        await updateDoc(doc(db, 'orders', did), {
+          status: 'delivered',
+          deliveredAt: serverTimestamp()
+        });
+      } catch (e) {
+        // Order doc may not exist for print jobs or edge cases — not fatal.
+        console.warn('Could not update order status from Re:Lay confirm:', e);
+      }
+    }
+
     const freshSnap = await getDoc(doc(db, 'deliveryChats', did));
     const fresh = freshSnap.data();
     if (fresh?.customerConfirmed && fresh?.riderConfirmed && !fresh?.archived) {
