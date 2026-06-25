@@ -200,6 +200,33 @@
     .toast.success { background: var(--success); }
     .toast.error { background: var(--danger); }
 
+    /* ── Upload progress overlay ──────────────────────────
+       Shows while files are being uploaded to Firebase
+       Storage so the student knows something's happening. */
+    .upload-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.55);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9998; backdrop-filter: blur(3px);
+    }
+    .upload-overlay.hidden { display: none !important; }
+    .upload-card {
+      background: var(--surface); border-radius: var(--radius-lg);
+      padding: 28px 24px; max-width: 320px; width: 90%;
+      box-shadow: var(--shadow-lg); text-align: center;
+    }
+    .upload-icon { font-size: 2.4rem; margin-bottom: 10px; }
+    .upload-title { font-weight: 700; font-size: 1rem; margin-bottom: 4px; }
+    .upload-label { font-size: 0.82rem; color: var(--muted); margin-bottom: 16px; }
+    .upload-track {
+      background: var(--bg); border-radius: 999px;
+      height: 8px; overflow: hidden; margin-bottom: 8px;
+    }
+    .upload-bar {
+      height: 100%; background: var(--orange); border-radius: 999px;
+      width: 0%; transition: width .3s ease;
+    }
+    .upload-pct { font-size: 0.78rem; color: var(--muted); }
+
     /* ── Receipt / Success screen ── */
     .receipt-screen {
       min-height: 100vh; background: var(--bg);
@@ -268,6 +295,17 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- Upload progress overlay — shown while files are being sent to Storage -->
+<div class="upload-overlay hidden" id="uploadOverlay">
+  <div class="upload-card">
+    <div class="upload-icon">☁️</div>
+    <div class="upload-title">Uploading your files…</div>
+    <div class="upload-label" id="uploadLabel">Preparing…</div>
+    <div class="upload-track"><div class="upload-bar" id="uploadBar"></div></div>
+    <div class="upload-pct" id="uploadPct">0%</div>
+  </div>
+</div>
+
 <!-- ══ MAIN FORM PAGE ══ -->
 <div id="pageForm">
   <nav class="topnav">
@@ -330,7 +368,7 @@
         </div>
         <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.jpg,.jpeg,.png,.txt" style="display:none" onchange="handleFileSelect(event)" />
         <div class="file-list" id="fileList"></div>
-        <div class="form-hint">Max 10 files. Files are stored as names — runner will coordinate via chat if needed.</div>
+        <div class="form-hint">Max 10 files · PDF, Word, JPG, PNG etc. Files are securely uploaded so the runner can download them directly.</div>
       </div>
     </div>
 
@@ -424,8 +462,10 @@
 <script type="module">
 import { initializeApp }        from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, addDoc, getDoc, collection, serverTimestamp, doc }
+import { getFirestore, addDoc, getDoc, setDoc, collection, serverTimestamp, doc }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey:            "AIzaSyB3ZfZNm8D2qUcbWFvv86ipCR23X5KkOsg",
@@ -436,9 +476,10 @@ const firebaseConfig = {
   appId:             "G-J1K0VM2XGF"
 };
 
-const app  = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db   = getFirestore(app);
+const app     = initializeApp(firebaseConfig);
+const auth    = getAuth(app);
+const db      = getFirestore(app);
+const storage = getStorage(app);
 
 let currentUser  = null;
 let userProfile  = null;
@@ -553,17 +594,66 @@ window.submitPrintOrder = async function () {
     showToast('Please attach at least one file to print', 'error'); return;
   }
 
-  const paperSize  = getSelectedChip('paperSizeChips');
-  const colorMode  = getSelectedChip('colorModeChips');
-  const sides      = getSelectedChip('sidesChips');
+  const paperSize = getSelectedChip('paperSizeChips');
+  const colorMode = getSelectedChip('colorModeChips');
+  const sides     = getSelectedChip('sidesChips');
 
   const btn = document.getElementById('submitBtn');
-  btn.disabled = true; btn.textContent = '⏳ Submitting…';
+  btn.disabled = true;
+  btn.textContent = '⏳ Submitting…';
+
+  // Pre-generate a Firestore doc ID so we can use it as the Storage
+  // folder name before the document actually exists.
+  const orderRef = doc(collection(db, 'orders'));
+  const orderId  = orderRef.id;
 
   try {
-    const fileNames = selectedFiles.map(f => f.name);
+    /* ── 1. Upload every file to Firebase Storage ────────────────
+       Path: print-files/{orderId}/{originalFilename}
+       This gives the runner a stable, per-order folder to download
+       from, without overwriting another student's files.  ───── */
+    const overlay  = document.getElementById('uploadOverlay');
+    const barEl    = document.getElementById('uploadBar');
+    const pctEl    = document.getElementById('uploadPct');
+    const labelEl  = document.getElementById('uploadLabel');
 
-    const docRef = await addDoc(collection(db, 'orders'), {
+    overlay.classList.remove('hidden');
+
+    const fileUrls = []; // [{name, url, size}]
+
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const file    = selectedFiles[i];
+      const fileRef = storageRef(storage, `print-files/${orderId}/${file.name}`);
+
+      labelEl.textContent = `File ${i + 1} of ${selectedFiles.length}: ${file.name}`;
+
+      // Upload with progress tracking
+      await new Promise((resolve, reject) => {
+        const task = uploadBytesResumable(fileRef, file, {
+          contentType: file.type || 'application/octet-stream'
+        });
+        task.on(
+          'state_changed',
+          (snap) => {
+            const fileProgress   = snap.bytesTransferred / snap.totalBytes;
+            const overallPct     = Math.round(((i + fileProgress) / selectedFiles.length) * 100);
+            barEl.style.width    = `${overallPct}%`;
+            pctEl.textContent    = `${overallPct}%`;
+          },
+          (err) => reject(err),
+          async () => {
+            const url = await getDownloadURL(task.snapshot.ref);
+            fileUrls.push({ name: file.name, url, size: file.size });
+            resolve();
+          }
+        );
+      });
+    }
+
+    overlay.classList.add('hidden');
+
+    /* ── 2. Write the Firestore order document with real URLs ── */
+    await setDoc(orderRef, {
       type:         'print',
       customerName: name,
       phoneNumber:  phone,
@@ -575,29 +665,31 @@ window.submitPrintOrder = async function () {
       course:       userProfile?.course    || '',
       yearLevel:    userProfile?.yearLevel || '',
       section:      userProfile?.section   || '',
-      // Print-specific fields
-      files:        fileNames,
+      // Files: actual download URLs so runners can open/save them
+      fileUrls,
+      files: fileUrls.map(f => f.name), // keep names for display backwards-compat
+      // Print specs
       paperSize,
       colorMode,
       sides,
       copies,
       notes,
-      // Fee (same structure as food orders so runner page works)
-      subtotal:     0,
-      deliveryFee:  15,
-      extraFee:     0,
-      total:        15,
-      status:       'pending',
-      createdAt:    serverTimestamp()
+      // Fee (same structure as food orders)
+      subtotal:    0,
+      deliveryFee: 15,
+      extraFee:    0,
+      total:       15,
+      status:      'pending',
+      createdAt:   serverTimestamp()
     });
 
-    // Show receipt
-    document.getElementById('receiptOrderId').textContent = `Order #${docRef.id.slice(-6).toUpperCase()}`;
+    /* ── 3. Show receipt ────────────────────────────────────── */
+    document.getElementById('receiptOrderId').textContent = `Order #${orderId.slice(-6).toUpperCase()}`;
     document.getElementById('receiptRows').innerHTML = `
       <div class="receipt-row"><span class="lbl">Name</span><span class="val">${name}</span></div>
       <div class="receipt-row"><span class="lbl">Contact</span><span class="val">${phone}</span></div>
       <div class="receipt-row"><span class="lbl">Deliver to</span><span class="val">${location}</span></div>
-      <div class="receipt-row"><span class="lbl">Files (${fileNames.length})</span><span class="val">${fileNames.join(', ')}</span></div>
+      <div class="receipt-row"><span class="lbl">Files (${fileUrls.length})</span><span class="val">${fileUrls.map(f=>f.name).join(', ')}</span></div>
       <div class="receipt-row"><span class="lbl">Paper</span><span class="val">${paperSize}</span></div>
       <div class="receipt-row"><span class="lbl">Color</span><span class="val">${colorMode}</span></div>
       <div class="receipt-row"><span class="lbl">Sides</span><span class="val">${sides}</span></div>
@@ -610,9 +702,11 @@ window.submitPrintOrder = async function () {
     window.scrollTo(0, 0);
 
   } catch (err) {
+    document.getElementById('uploadOverlay').classList.add('hidden');
     console.error(err);
     showToast('Could not submit — please try again', 'error');
-    btn.disabled = false; btn.textContent = 'Submit Print Request →';
+    btn.disabled = false;
+    btn.textContent = 'Submit Print Request →';
   }
 };
 
