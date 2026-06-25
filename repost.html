@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Re:Post — Freedom Wall</title>
+<style>
+:root {
+  --bg:      #0e1117;
+  --surface: #161b27;
+  --red:     #ff4757;
+  --text:    #eef0f8;
+  --muted:   #7880a0;
+  --border:  rgba(255,255,255,0.07);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background-color: var(--bg);
+  /* subtle corkboard grid lines */
+  background-image:
+    repeating-linear-gradient(0deg,  transparent 0, transparent 39px, rgba(255,255,255,0.02) 40px),
+    repeating-linear-gradient(90deg, transparent 0, transparent 39px, rgba(255,255,255,0.02) 40px);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  min-height: 100vh;
+  color: var(--text);
+}
+
+/* ── HEADER ──────────────────────────────────── */
+.hd {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(22,27,39,0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 11px 18px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.logo { font-size: 1.5rem; font-weight: 900; letter-spacing: -1.5px; line-height: 1; }
+.logo .re  { color: var(--red); }
+.logo .sep { color: var(--red); font-weight: 300; }
+.logo .post-word { color: var(--text); }
+.sub { font-size: 0.7rem; color: var(--muted); font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; margin-top: 1px; }
+.badge {
+  display: inline-block; font-size: 0.68rem; font-weight: 700;
+  background: rgba(255,71,87,0.15); color: var(--red);
+  border: 1px solid rgba(255,71,87,0.3);
+  padding: 2px 8px; border-radius: 20px; margin-left: 10px; letter-spacing: 0.3px;
+}
+.hd-right { display: flex; align-items: center; gap: 10px; }
+.new-btn {
+  background: var(--red); color: #fff; border: none;
+  border-radius: 20px; padding: 8px 20px;
+  font-weight: 700; font-size: 0.88rem; cursor: pointer;
+  letter-spacing: 0.2px; transition: opacity 0.15s;
+}
+.new-btn:hover { opacity: 0.85; }
+
+/* ── BOARD ───────────────────────────────────── */
+.wrap { max-width: 1320px; margin: 0 auto; padding: 22px 14px 100px; }
+.board { columns: 4 190px; column-gap: 12px; }
+@media (max-width: 640px)  { .board { columns: 2 150px; column-gap: 10px; } }
+
+/* ── CARD ────────────────────────────────────── */
+.card {
+  break-inside: avoid;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 5px 18px rgba(0,0,0,0.45), 0 1px 4px rgba(0,0,0,0.3);
+  position: relative;
+  transition: transform 0.18s, box-shadow 0.18s;
+  cursor: default;
+}
+.card:hover { transform: translateY(-4px) rotate(0deg) scale(1.02) !important; box-shadow: 0 12px 32px rgba(0,0,0,0.55); }
+/* staggered natural tilts */
+.card:nth-child(5n+1) { transform: rotate(-1.3deg); }
+.card:nth-child(5n+2) { transform: rotate(0.7deg);  }
+.card:nth-child(5n+3) { transform: rotate(-0.5deg); }
+.card:nth-child(5n+4) { transform: rotate(1.1deg);  }
+.card:nth-child(5n+5) { transform: rotate(-0.9deg); }
+
+.pin {
+  position: absolute; top: -6px; left: 50%; transform: translateX(-50%);
+  width: 15px; height: 15px; border-radius: 50%; z-index: 4;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5), 0 0 0 2.5px var(--bg);
+}
+.card-accent { height: 4px; width: 100%; }
+.card-img { width: 100%; display: block; object-fit: cover; max-height: 210px; }
+.card-body { padding: 13px 12px 11px; }
+.card-author {
+  font-size: 0.69rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 0.6px; opacity: 0.5; margin-bottom: 7px;
+}
+.card-text { font-size: 0.87rem; line-height: 1.55; word-break: break-word; }
+.card-foot { display: flex; align-items: center; justify-content: flex-end; margin-top: 9px; }
+.card-timer { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.3px; transition: color 0.5s; }
+
+/* ── EMPTY / LOADING ──────────────────────────── */
+.empty, .ld { text-align: center; padding: 80px 20px; color: var(--muted); }
+.empty-icon  { font-size: 3rem; opacity: 0.35; margin-bottom: 12px; }
+.ld-dots span {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--muted); margin: 0 3px; animation: blink 1.2s infinite;
+}
+.ld-dots span:nth-child(2) { animation-delay: 0.2s; }
+.ld-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes blink { 0%,80%,100% { opacity:0.2; transform:scale(1); } 40% { opacity:1; transform:scale(1.3); } }
+
+/* ── PAGINATION ───────────────────────────────── */
+.page-bar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: rgba(22,27,39,0.95);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border);
+  padding: 9px 20px;
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+}
+.pg {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: rgba(255,255,255,0.07); color: var(--text);
+  border: 1px solid var(--border); cursor: pointer; font-size: 0.95rem;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.pg:hover:not(:disabled) { background: rgba(255,255,255,0.16); }
+.pg:disabled { opacity: 0.25; cursor: default; }
+.pginfo { font-size: 0.8rem; color: var(--muted); min-width: 88px; text-align: center; font-weight: 600; }
+
+/* ── MODAL ────────────────────────────────────── */
+.overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.72); z-index: 200;
+  align-items: flex-end; justify-content: center;
+}
+.overlay.on { display: flex; }
+.sheet {
+  background: var(--surface); border-radius: 22px 22px 0 0;
+  padding: 22px 18px 38px; width: 100%; max-width: 540px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  animation: slideUp 0.22s cubic-bezier(.22,.61,.36,1);
+}
+@keyframes slideUp { from { transform: translateY(100%); opacity:0; } }
+.sheet-title { font-weight: 800; font-size: 1rem; margin-bottom: 16px; }
+.sheet-title span { color: var(--red); }
+.field {
+  width: 100%; background: rgba(255,255,255,0.06);
+  border: 1.5px solid rgba(255,255,255,0.08);
+  border-radius: 10px; padding: 11px 13px;
+  font-family: inherit; font-size: 0.9rem; color: var(--text);
+  margin-bottom: 10px; outline: none; resize: none;
+  transition: border-color 0.15s;
+}
+.field::placeholder { color: var(--muted); }
+.field:focus { border-color: var(--red); }
+textarea.field { min-height: 88px; }
+.charcount { font-size: 0.7rem; color: var(--muted); text-align: right; margin-top: -7px; margin-bottom: 10px; }
+.prev-wrap { position: relative; margin-bottom: 10px; display: none; }
+.prev-img  { width: 100%; max-height: 160px; object-fit: cover; border-radius: 10px; display: block; }
+.rm-img {
+  position: absolute; top: 6px; right: 6px;
+  width: 24px; height: 24px; border-radius: 50%;
+  background: rgba(0,0,0,0.6); border: none; color: #fff;
+  font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.sheet-acts { display: flex; gap: 10px; align-items: center; }
+.ph-btn { background: rgba(255,255,255,0.08); color: var(--text); border: none; border-radius: 8px; padding: 10px 14px; cursor: pointer; font-size: 0.85rem; white-space: nowrap; }
+.ph-btn:hover { background: rgba(255,255,255,0.14); }
+.sub-btn { flex: 1; background: var(--red); color: #fff; border: none; border-radius: 20px; padding: 11px; font-weight: 700; font-size: 0.93rem; cursor: pointer; transition: opacity 0.15s; }
+.sub-btn:hover { opacity: 0.87; }
+.sub-btn:disabled { opacity: 0.5; cursor: default; }
+.can-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.82rem; padding: 6px; }
+
+/* ── TOAST ────────────────────────────────────── */
+.toast {
+  position: fixed; top: 66px; left: 50%; transform: translateX(-50%);
+  background: #22273c; color: var(--text);
+  padding: 9px 18px; border-radius: 20px; font-size: 0.82rem; font-weight: 600;
+  z-index: 999; opacity: 0; pointer-events: none;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  transition: opacity 0.2s; white-space: nowrap;
+}
+.toast.on { opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header class="hd">
+  <div>
+    <div class="logo">
+      <span class="re">Re</span><span class="sep">:</span><span class="post-word">Post</span>
+      <span class="badge" id="liveCount">… live</span>
+    </div>
+    <div class="sub">Campus Freedom Wall</div>
+  </div>
+  <div class="hd-right">
+    <button class="new-btn" onclick="openModal()">+ Post</button>
+  </div>
+</header>
+
+<!-- ── BOARD ── -->
+<div class="wrap">
+  <div id="board" class="board"></div>
+  <div id="empty" class="empty" style="display:none">
+    <div class="empty-icon">📌</div>
+    <div>The wall is empty — be the first to post something!</div>
+  </div>
+  <div id="ld" class="ld">
+    <div class="ld-dots"><span></span><span></span><span></span></div>
+    <div style="margin-top:12px;font-size:0.82rem">Loading the board…</div>
+  </div>
+</div>
+
+<!-- ── PAGINATION ── -->
+<nav class="page-bar">
+  <button class="pg" id="prevBtn" onclick="goPage(-1)" disabled>&#9664;</button>
+  <span class="pginfo" id="pginfo">Page 1</span>
+  <button class="pg" id="nextBtn" onclick="goPage(1)"  disabled>&#9654;</button>
+</nav>
+
+<!-- ── POST MODAL ── -->
+<div class="overlay" id="overlay" onclick="overlayClick(event)">
+  <div class="sheet">
+    <div class="sheet-title">📌 Pin something to the wall</div>
+    <input  class="field" id="pName" type="text"   placeholder="Your name (optional — leave blank for Anonymous)" maxlength="30" />
+    <textarea class="field" id="pText" placeholder="What's on your mind? Anything goes…" maxlength="500" oninput="updateCount()"></textarea>
+    <div class="charcount"><span id="charCount">0</span>/500</div>
+    <div class="prev-wrap" id="prevWrap">
+      <img class="prev-img" id="prevImg" alt="preview" />
+      <button class="rm-img" onclick="removeImg()" title="Remove photo">✕</button>
+    </div>
+    <div class="sheet-acts">
+      <label class="ph-btn" for="fImg">📷 Photo</label>
+      <input type="file" id="fImg" accept="image/*" style="display:none" onchange="pickImg(this)" />
+      <button class="sub-btn" id="subBtn" onclick="submitPost()">Post it</button>
+      <button class="can-btn" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, addDoc, query, where, orderBy, onSnapshot, Timestamp }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+/* ── Firebase ───────────────────────────── */
+const app = initializeApp({
+  apiKey:            "AIzaSyB3ZfZNm8D2qUcbWFvv86ipCR23X5KkOsg",
+  authDomain:        "request-f183d.firebaseapp.com",
+  projectId:         "request-f183d",
+  storageBucket:     "request-f183d.firebasestorage.app",
+  messagingSenderId: "189332484631",
+  appId:             "G-J1K0VM2XGF"
+}, "repost-app");
+const db = getFirestore(app);
+
+/* ── Constants ──────────────────────────── */
+const PER_PAGE = 12;
+const TTL_MS   = 12 * 3600 * 1000;
+const CARD_BG  = ["#fff9c4","#fce4ec","#e3f2fd","#e8f5e9","#f3e5f5","#fff3e0","#e0f7fa","#fdf0e3"];
+const CARD_TX  = ["#2c2800","#3b0012","#0d1f3c","#0a2214","#1e0030","#3a1500","#00272e","#3a1d00"];
+const ACCENTS  = ["#f59e0b","#ef4444","#3b82f6","#22c55e","#a855f7","#ec4899","#06b6d4","#f97316"];
+
+/* ── State ──────────────────────────────── */
+let allPosts = [], page = 0, imgData = null;
+
+/* ── Globals for inline handlers ────────── */
+Object.assign(window, { openModal, closeModal, overlayClick, pickImg, removeImg, submitPost, goPage, updateCount });
+
+/* ── Real-time feed (server-side 12h filter) */
+const cutoff = Timestamp.fromMillis(Date.now() - TTL_MS);
+onSnapshot(
+  query(collection(db,"repost_posts"), where("createdAt",">",cutoff), orderBy("createdAt","desc")),
+  snap => {
+    const now = Date.now();
+    allPosts = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(p => (p.createdAt?.toMillis?.() || 0) + TTL_MS > now);
+    page = 0;
+    render();
+  },
+  err => { console.error(err); showToast("Connection error."); }
+);
+
+/* ── Render ─────────────────────────────── */
+function render() {
+  const board = document.getElementById("board");
+  const empty = document.getElementById("empty");
+  document.getElementById("ld").style.display = "none";
+  document.getElementById("liveCount").textContent = allPosts.length + " live";
+
+  if (!allPosts.length) {
+    board.innerHTML = "";
+    empty.style.display = "block";
+    syncNav();
+    return;
+  }
+  empty.style.display = "none";
+  const slice = allPosts.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE);
+  board.innerHTML = slice.map(buildCard).join("");
+  syncNav();
+  slice.forEach(p => runTimer(p.id, (p.createdAt?.toMillis?.() || 0) + TTL_MS));
+}
+
+function buildCard(p) {
+  const h   = hashId(p.id);
+  const bg  = CARD_BG[h % CARD_BG.length];
+  const tx  = CARD_TX[h % CARD_TX.length];
+  const acc = ACCENTS[h % ACCENTS.length];
+  const aut = esc(p.name || "Anonymous");
+  const txt = esc(p.text || "");
+  const img = p.image ? `<img class="card-img" src="${p.image}" loading="lazy" alt="">` : "";
+  return `
+    <div class="card" data-id="${p.id}" style="background:${bg};color:${tx}">
+      <div class="pin" style="background:${acc}"></div>
+      <div class="card-accent" style="background:${acc}"></div>
+      ${img}
+      <div class="card-body">
+        <div class="card-author">📌 ${aut}</div>
+        ${txt ? `<div class="card-text">${txt}</div>` : ""}
+        <div class="card-foot">
+          <span class="card-timer" id="ct-${p.id}"></span>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ── Countdown timers ───────────────────── */
+function runTimer(id, exp) {
+  const el = document.getElementById("ct-"+id);
+  if (!el) return;
+  (function tick() {
+    const d = exp - Date.now();
+    if (d <= 0) { el.textContent = "expired"; el.style.color = "#888"; return; }
+    const h = Math.floor(d / 3600000);
+    const m = Math.floor((d % 3600000) / 60000);
+    const s = Math.floor((d % 60000) / 1000);
+    el.textContent = h ? `⏳ ${h}h ${m}m` : `⏳ ${m}m ${s}s`;
+    el.style.color  = d < 3600000 ? "#ff4757" : d < 10800000 ? "#f59e0b" : "inherit";
+    setTimeout(tick, 1000);
+  })();
+}
+
+/* ── Pagination ─────────────────────────── */
+function syncNav() {
+  const tot = Math.max(1, Math.ceil(allPosts.length / PER_PAGE));
+  document.getElementById("pginfo").textContent = `Page ${page + 1} of ${tot}`;
+  document.getElementById("prevBtn").disabled = page === 0;
+  document.getElementById("nextBtn").disabled = page >= tot - 1;
+}
+function goPage(dir) {
+  const tot = Math.ceil(allPosts.length / PER_PAGE);
+  page = Math.max(0, Math.min(tot - 1, page + dir));
+  render();
+  scrollTo({ top: 0, behavior: "smooth" });
+}
+
+/* ── Modal ──────────────────────────────── */
+function openModal()  { document.getElementById("overlay").classList.add("on"); }
+function closeModal() {
+  document.getElementById("overlay").classList.remove("on");
+  ["pName","pText"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("prevWrap").style.display = "none";
+  document.getElementById("fImg").value = "";
+  document.getElementById("charCount").textContent = "0";
+  imgData = null;
+}
+function overlayClick(e) { if (e.target.id === "overlay") closeModal(); }
+function updateCount() {
+  document.getElementById("charCount").textContent = document.getElementById("pText").value.length;
+}
+
+/* ── Image handling ─────────────────────── */
+function pickImg(input) {
+  const f = input.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = e => compress(e.target.result, 720, 0.72, b64 => {
+    imgData = b64;
+    const img = document.getElementById("prevImg");
+    img.src = b64;
+    document.getElementById("prevWrap").style.display = "block";
+  });
+  r.readAsDataURL(f);
+}
+function removeImg() {
+  imgData = null;
+  document.getElementById("prevImg").src = "";
+  document.getElementById("prevWrap").style.display = "none";
+  document.getElementById("fImg").value = "";
+}
+function compress(src, maxW, quality, cb) {
+  const img = new Image();
+  img.onload = () => {
+    const r  = Math.min(1, maxW / img.width);
+    const cv = document.createElement("canvas");
+    cv.width  = img.width  * r;
+    cv.height = img.height * r;
+    cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+    cb(cv.toDataURL("image/jpeg", quality));
+  };
+  img.src = src;
+}
+
+/* ── Submit ─────────────────────────────── */
+async function submitPost() {
+  const text = document.getElementById("pText").value.trim();
+  const name = document.getElementById("pName").value.trim();
+  if (!text && !imgData) { showToast("Write something or add a photo first!"); return; }
+  const btn = document.getElementById("subBtn");
+  btn.textContent = "Posting…"; btn.disabled = true;
+  try {
+    await addDoc(collection(db, "repost_posts"), {
+      name:      name   || null,
+      text:      text   || null,
+      image:     imgData || null,
+      createdAt: Timestamp.now()
+    });
+    closeModal();
+    showToast("📌 Pinned to the wall!");
+  } catch (e) {
+    console.error(e);
+    showToast("Failed to post — try again.");
+  } finally {
+    btn.textContent = "Post it"; btn.disabled = false;
+  }
+}
+
+/* ── Helpers ────────────────────────────── */
+function esc(s) {
+  return String(s)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/\n/g,"<br>");
+}
+function hashId(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("on");
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove("on"), 2600);
+}
+</script>
+</body>
+</html>

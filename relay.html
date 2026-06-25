@@ -333,6 +333,11 @@
   }
   .nav-link-btn:hover, .nav-link-btn.active { background: var(--orange-light); color: var(--orange); }
   .nav-link-btn .unread-pill { margin-left: auto; }
+  /* Re:Post gets its own accent (its brand red) so it reads as a
+     distinct destination rather than another Relay section. */
+  .nav-link-btn.repost { background: rgba(255,71,87,.1); color: #ff4757; }
+  .nav-link-btn.repost:hover { background: rgba(255,71,87,.18); }
+  .nav-link-btn .nav-link-go { margin-left: auto; opacity: .55; font-size: .8rem; }
 
   /* Send button */
   .relay-send-btn {
@@ -468,6 +473,10 @@
   <!-- 3 & 4. NAVIGATION -->
   <div class="relay-panel-section">
     <div class="relay-panel-label">Go To</div>
+    <a class="nav-link-btn repost" href="repost.html">
+      📌 Re:Post — Freedom Wall
+      <span class="nav-link-go">↗</span>
+    </a>
     <div class="nav-link-btn active" id="navDM" onclick="switchSection('dm'); closePanel();">
       💬 Direct Messages
     </div>
