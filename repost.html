@@ -46,6 +46,10 @@ body {
   border: 1px solid rgba(252,76,2,0.3);
   padding: 2px 8px; border-radius: 20px; margin-left: 10px; letter-spacing: 0.3px;
 }
+.badge-cherry {
+  background: #fdf2f8; color: #be185d;
+  border: 1px solid #f9a8d4;
+}
 .hd-right { display: flex; align-items: center; gap: 10px; }
 .hd-left { display: flex; align-items: center; gap: 12px; }
 /* Re:Lay gets its own brand-orange pill (same accent Re:Lay uses
@@ -382,11 +386,23 @@ function buildCard(p) {
   const role    = (p.authorRole || 'student').toLowerCase();
   const isAdminPost  = role === 'admin';
   const isRunnerPost = role === 'runner';
-  const badgeHtml = isAdminPost
+  const special = p.authorBadges || [];
+
+  // Special manually-granted badges (cherry, developer, founder) — shown first
+  const specialBadgesHtml = [
+    special.includes('cherry')    ? `<span class="badge badge-cherry" style="font-size:0.65rem;padding:2px 7px">🍒 Cherry</span>` : '',
+    special.includes('developer') ? `<span class="badge" style="background:#dc2626;color:#fff;font-size:0.65rem;padding:2px 7px">🛠️ Developer</span>` : '',
+    special.includes('founder')   ? `<span class="badge" style="background:#fff;color:#111;border:1px solid #e5e7eb;font-size:0.65rem;padding:2px 7px">✨ Founder</span>` : '',
+  ].join('');
+
+  // Role badge
+  const roleBadgeHtml = isAdminPost
     ? `<span class="badge" style="background:#fff3cd;color:#92400e;font-size:0.65rem;padding:2px 7px;margin-left:5px">👑 Admin</span>`
     : isRunnerPost
     ? `<span class="badge" style="background:#dbeafe;color:#1e40af;font-size:0.65rem;padding:2px 7px;margin-left:5px">🏃 Runner</span>`
     : '';
+
+  const badgeHtml = specialBadgesHtml + roleBadgeHtml;
 
   return `
     <div class="card" data-id="${p.id}" style="background:${bg};color:${tx}">
@@ -510,7 +526,8 @@ async function submitPost() {
       text:       text    || null,
       image:      imgData || null,
       uid:        currentUser?.uid || null,
-      authorRole: userProfile?.role || 'student',
+      authorRole: userProfile?.role    || 'student',
+      authorBadges: userProfile?.badges || [],
       createdAt:  Timestamp.now()
     });
     closeModal();

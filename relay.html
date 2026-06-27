@@ -160,6 +160,10 @@
     border: 1px solid #e5e7eb;
     box-shadow: 0 1px 6px rgba(255,255,255,.5), inset 0 0 0 1px rgba(255,255,255,.6);
   }
+  .badge-cherry {
+    background: #fdf2f8; color: #be185d;
+    border: 1px solid #f9a8d4;
+  }
   /* Lets a person carry more than one badge at once — wraps so it
      never breaks the row it's sitting in on a narrow screen. */
   .badge-stack { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
@@ -665,6 +669,7 @@ function getUserBadges(u) {
   const list = [];
   if (special.includes('founder'))   list.push({ cls: 'badge-founder',   text: '✨ Founder' });
   if (special.includes('developer')) list.push({ cls: 'badge-developer', text: '🛠️ Developer' });
+  if (special.includes('cherry'))    list.push({ cls: 'badge-cherry',    text: '🍒 Cherry' });
   if (u.role === 'admin')            list.push({ cls: 'badge-admin',     text: '👑 Admin' });
   else if (u.role === 'runner')      list.push({ cls: 'badge-blue',      text: '🏃 Runner' });
   if (list.length === 0)             list.push({ cls: 'badge-gray',      text: '🎓 Student' });
