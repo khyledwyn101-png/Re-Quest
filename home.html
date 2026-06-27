@@ -37,6 +37,13 @@
       --shadow-sm:   0 1px 3px rgba(0,0,0,.08);
       --shadow:      0 4px 16px rgba(0,0,0,.10);
       --shadow-lg:   0 8px 32px rgba(0,0,0,.13);
+      /* Borrow / SOS board — light mode defaults */
+      --sos-board-bg:     #ffffff;
+      --sos-board-dot:    rgba(17,24,39,.06);
+      --sos-board-border: #ffffff;
+      --sos-k-color:      rgba(17,24,39,.5);
+      --sos-foot-border:  rgba(17,24,39,.15);
+      --sos-time-color:   rgba(17,24,39,.48);
     }
 
     /* ─── DARK MODE ───────────────────────────────────────────
@@ -53,6 +60,13 @@
       --shadow-sm:   0 1px 3px rgba(0,0,0,.4);
       --shadow:      0 4px 16px rgba(0,0,0,.5);
       --shadow-lg:   0 8px 32px rgba(0,0,0,.6);
+      /* Borrow / SOS board — dark mode overrides */
+      --sos-board-bg:      #1A1D24;
+      --sos-board-dot:     rgba(255,255,255,.05);
+      --sos-board-border:  #2A2E37;
+      --sos-k-color:       rgba(255,255,255,.38);
+      --sos-foot-border:   rgba(255,255,255,.12);
+      --sos-time-color:    rgba(255,255,255,.36);
     }
 
     /* ─── RESET ───────────────────────────────────────────── */
@@ -1053,10 +1067,10 @@
     .sos-board-frame { position: relative; z-index: 1; }
     .sos-board {
       position: relative;
-      background: #fff;
-      background-image: radial-gradient(circle, rgba(17,24,39,.06) 1px, transparent 1px);
+      background: var(--sos-board-bg);
+      background-image: radial-gradient(circle, var(--sos-board-dot) 1px, transparent 1px);
       background-size: 16px 16px;
-      border: 3px solid #fff;
+      border: 3px solid var(--sos-board-border);
       outline: 3px solid var(--orange);
       outline-offset: -3px;
       border-radius: var(--radius-lg);
@@ -1116,14 +1130,14 @@
     }
     .sos-card-body { margin-bottom: 12px; display: flex; flex-direction: column; gap: 3px; }
     .sos-row { display: flex; gap: 5px; font-size: 0.73rem; line-height: 1.5; }
-    .sos-k { font-weight: 700; color: rgba(17,24,39,.5); flex-shrink: 0; }
+    .sos-k { font-weight: 700; color: var(--sos-k-color); flex-shrink: 0; }
     .sos-v { font-weight: 600; color: var(--text); word-break: break-word; }
     .sos-row.sos-reward .sos-v { color: var(--orange-dark); font-weight: 800; }
     .sos-card-foot {
       display: flex; flex-direction: column; gap: 9px;
-      border-top: 1.5px dashed rgba(17,24,39,.15); padding-top: 10px;
+      border-top: 1.5px dashed var(--sos-foot-border); padding-top: 10px;
     }
-    .sos-time { font-size: 0.67rem; color: rgba(17,24,39,.48); font-weight: 600; }
+    .sos-time { font-size: 0.67rem; color: var(--sos-time-color); font-weight: 600; }
     .sos-accept-btn {
       width: 100%; background: var(--orange); color: #fff;
       font-weight: 700; font-size: 0.78rem; padding: 10px 12px;
@@ -2324,7 +2338,14 @@ const MENU = [
    numeric id; new posts use Date.now() so they always sort to
    the top safely.
 ─────────────────────────────────────────────────────────── */
-const SOS_STICKY_COLORS = ['#FFE898', '#FFC9D4', '#BFE3F5', '#C9F0D8', '#E3D6FB'];
+const SOS_STICKY_COLORS_LIGHT = ['#FFE898', '#FFC9D4', '#BFE3F5', '#C9F0D8', '#E3D6FB'];
+const SOS_STICKY_COLORS_DARK  = ['#3D3310', '#3D1820', '#152233', '#152B1E', '#251D3D'];
+
+function sosBgColor(id) {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const palette = isDark ? SOS_STICKY_COLORS_DARK : SOS_STICKY_COLORS_LIGHT;
+  return palette[hashSOSId(id) % palette.length];
+}
 
 let SOS = [];
 
@@ -2609,6 +2630,9 @@ window.toggleDarkMode = function () {
   const isDark = document.getElementById('darkModeToggle').checked;
   document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
   try { localStorage.setItem('requestTheme', isDark ? 'dark' : 'light'); } catch (e) {}
+  // Re-render the SOS board so sticky-card background colours pick up
+  // the correct palette (light pastels vs dark muted tones) immediately.
+  renderSOSBoard();
 };
 
 // Persists the bio straight to the student's Firestore profile doc —
@@ -3695,7 +3719,7 @@ function hashSOSId(id) {
   return Math.abs(h);
 }
 function sosRotation(id) { return ((hashSOSId(id) % 7) - 3) * 1.1; }
-function sosColor(id)    { return SOS_STICKY_COLORS[hashSOSId(id) % SOS_STICKY_COLORS.length]; }
+function sosColor(id)    { return sosBgColor(id); }
 
 function timeAgo(ts) {
   const sec = Math.floor((Date.now() - ts) / 1000);
