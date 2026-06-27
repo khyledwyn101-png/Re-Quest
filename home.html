@@ -145,7 +145,7 @@
       width: 42px; height: 42px; padding: 0; border-radius: 50%;
       background: var(--surface); border: 1.5px solid var(--border);
       display: inline-flex; align-items: center; justify-content: center;
-      font-size: 1.1rem; box-shadow: var(--shadow-sm);
+      font-size: 1.1rem; box-shadow: var(--shadow-sm); flex-shrink: 0;
     }
     .btn-icon:hover { border-color: var(--orange); color: var(--orange); }
     .btn-lg { padding: 18px 32px; font-size: 1.05rem; border-radius: var(--radius-lg); }
@@ -244,14 +244,16 @@
     .topnav {
       position: sticky; top: 0; z-index: 100;
       background: var(--surface); border-bottom: 1px solid var(--border);
-      padding: 0 20px; height: 60px;
+      padding: 0 14px; height: 60px;
       display: flex; align-items: center; justify-content: space-between;
       box-shadow: var(--shadow-sm);
     }
+    .topnav .flex.items-center.gap-3 { gap: 8px; }
     .topnav-logo {
       font-family: 'Syne', sans-serif; font-weight: 800;
-      font-size: 1.4rem; letter-spacing: -0.5px;
+      font-size: 1.3rem; letter-spacing: -0.5px;
       display: flex; align-items: center; gap: 4px;
+      white-space: nowrap;
     }
     .topnav-logo span.re { color: var(--orange); }
     .topnav-logo span.quest { color: var(--text); }
@@ -817,10 +819,13 @@
     }
     .modal-overlay.open { opacity: 1; pointer-events: all; }
     .modal-box {
+      position: relative;
       background: var(--surface); border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-      width: 100%; max-width: 480px; padding: 24px 20px;
+      width: 100%; max-width: 480px; max-height: 85vh; overflow-y: auto;
+      padding: 24px 20px;
       transform: translateY(40px); transition: transform .3s cubic-bezier(.16,1,.3,1);
       box-shadow: 0 -8px 40px rgba(0,0,0,.2);
+      -webkit-overflow-scrolling: touch;
     }
     .modal-overlay.open .modal-box { transform: translateY(0); }
     .modal-handle {
@@ -979,6 +984,9 @@
       .form-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
       .cart-btn { width: auto; height: auto; padding: 8px 14px; border-radius: var(--radius-sm); justify-content: flex-start; }
       .cart-btn .cart-label { display: inline; }
+      .topnav { padding: 0 20px; }
+      .topnav .flex.items-center.gap-3 { gap: 12px; }
+      .topnav-logo { font-size: 1.4rem; }
     }
     @media (min-width: 900px) {
       .page-body { max-width: 720px; margin: 0 auto; }
@@ -1368,6 +1376,7 @@
       </div>
     </div>
 
+    <button class="topnav-nav-link" onclick="closeNavPanel();openUsersModal();" style="width:100%;cursor:pointer;text-align:left;font-family:inherit">👥 Campus Directory <span style="margin-left:auto;opacity:.6;font-size:.8rem">→</span></button>
     <a class="topnav-nav-link repost" href="repost.html">📌 Re:Post — Freedom Wall <span style="margin-left:auto;opacity:.6;font-size:.8rem">↗</span></a>
     <a class="topnav-nav-link" href="relay.html">💬 Re:Lay — Messages <span style="margin-left:auto;opacity:.6;font-size:.8rem">↗</span></a>
     <a class="topnav-nav-link" href="runner.html">🏃 Runner Portal <span style="margin-left:auto;opacity:.6;font-size:.8rem">↗</span></a>
@@ -1391,7 +1400,6 @@
         <div class="cart-count" id="cartCount">0</div>
       </button>
       <a class="btn-icon" href="relay.html" title="Messages">💬</a>
-      <button class="btn-icon" onclick="openUsersModal()" title="Campus Directory" style="font-size:1rem">👥</button>
       <div class="avatar" id="homeAvatar" onclick="toggleProfile()" title="My Account">?</div>
     </div>
   </nav>
@@ -2567,6 +2575,7 @@ window.toggleProfile = function () {
   const isDark  = document.documentElement.getAttribute('data-theme') === 'dark';
 
   document.getElementById('profileModalContent').innerHTML = `
+    <button class="btn-icon" onclick="closeProfileModal()" style="position:absolute;top:14px;right:14px;width:34px;height:34px;font-size:1rem;z-index:1">✕</button>
     <div class="profile-header">
       ${avatarWrapHtml(name)}
       <div style="min-width:0">
