@@ -2874,8 +2874,8 @@ function renderUserResults(rawQuery) {
             ${metaLine ? `<div class="profile-sub">${escapeHtml(metaLine)}</div>` : ''}
             ${u.bio ? `<div class="text-xs text-muted" style="margin-top:3px;line-height:1.4">${escapeHtml(u.bio)}</div>` : ''}
           </div>
-          ${badgeStackHtml(u, 'flex-shrink:0')}
         </div>
+        ${badgeStackHtml(u, 'display:grid;grid-template-columns:repeat(2,1fr);justify-items:start;gap:6px;margin-top:10px')}
         <a class="btn btn-primary btn-sm w-full mt-3" href="relay.html"
            style="display:block;text-align:center;text-decoration:none">💬 Message in Re:Lay</a>
       </div>`;
