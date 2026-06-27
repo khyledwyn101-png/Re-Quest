@@ -14,7 +14,6 @@
   --border:  rgba(255,255,255,0.07);
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { overflow-x: hidden; }
 
 body {
   background-color: var(--bg);
@@ -25,7 +24,6 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   min-height: 100vh;
   color: var(--text);
-  overflow-x: hidden;
 }
 
 /* ── HEADER ──────────────────────────────────── */
@@ -277,11 +275,11 @@ textarea.field { min-height: 88px; }
 
 <script type="module">
 import { initializeApp }
-  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, collection, addDoc, deleteDoc, doc, getDoc, query, where, orderBy, onSnapshot, Timestamp }
-  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, onAuthStateChanged }
-  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 /* ── Firebase ───────────────────────────── */
 const app = initializeApp({
@@ -520,23 +518,30 @@ async function submitPost() {
   const text = document.getElementById("pText").value.trim();
   const name = document.getElementById("pName").value.trim();
   if (!text && !imgData) { showToast("Write something or add a photo first!"); return; }
+
+  if (!currentUser) { showToast("Sign in to post to the wall."); return; }
+
   const btn = document.getElementById("subBtn");
   btn.textContent = "Posting…"; btn.disabled = true;
   try {
     await addDoc(collection(db, "repost_posts"), {
-      name:       name    || null,
-      text:       text    || null,
-      image:      imgData || null,
-      uid:        currentUser?.uid || null,
-      authorRole: userProfile?.role    || 'student',
-      authorBadges: userProfile?.badges || [],
-      createdAt:  Timestamp.now()
+      name:         name    || null,
+      text:         text    || null,
+      image:        imgData || null,
+      uid:          currentUser?.uid || null,
+      authorRole:   userProfile?.role    || 'student',
+      authorBadges: userProfile?.badges  || [],
+      createdAt:    Timestamp.now()
     });
     closeModal();
     showToast("📌 Pinned to the wall!");
   } catch (e) {
     console.error(e);
-    showToast("Failed to post — try again.");
+    if (e?.code === 'permission-denied') {
+      showToast("Permission denied — ask admin to update Firestore rules.");
+    } else {
+      showToast("Failed to post — try again.");
+    }
   } finally {
     btn.textContent = "Post it"; btn.disabled = false;
   }
