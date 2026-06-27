@@ -696,7 +696,7 @@ onAuthStateChanged(auth, async (user) => {
 
     runnerProfile = snap.data();
 
-    if (runnerProfile.role === 'runner') {
+    if (runnerProfile.role === 'runner' || runnerProfile.role === 'admin') {
       document.getElementById('runnerNameLabel').textContent = runnerProfile.fullName || user.email;
       goToPage('pageDashboard');
       subscribeOrders();
