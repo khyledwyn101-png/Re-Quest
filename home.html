@@ -184,12 +184,6 @@
       letter-spacing: .3px; text-transform: uppercase;
     }
     .badge-admin  { background: #fff3cd; color: #92400e; }
-    .topnav-repost-btn {
-      display: inline-flex; align-items: center; gap: 5px;
-      padding: 6px 11px; border-radius: 999px; font-size: 0.78rem; font-weight: 700;
-      background: rgba(255,71,87,.1); color: #ff4757; transition: background .15s;
-    }
-    .topnav-repost-btn:hover { background: rgba(255,71,87,.18); }
     .topnav-nav-link {
       display: flex; align-items: center; gap: 10px;
       padding: 11px 14px; border-radius: var(--radius-sm);
@@ -800,6 +794,28 @@
       background: var(--border); margin: 0 auto 20px;
     }
 
+    /* ══════════════════════════════════════════════════════════
+       SIDE PANEL (Navigate — slides in from the right, unlike the
+       bottom-sheet modals above)
+    ══════════════════════════════════════════════════════════ */
+    .sidepanel-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.5);
+      z-index: 310; display: flex; align-items: stretch; justify-content: flex-end;
+      opacity: 0; pointer-events: none; transition: opacity .25s;
+    }
+    .sidepanel-overlay.open { opacity: 1; pointer-events: all; }
+    .sidepanel-box {
+      background: var(--surface); width: 300px; max-width: 84vw; height: 100%;
+      padding: 22px 18px; overflow-y: auto;
+      transform: translateX(100%); transition: transform .3s cubic-bezier(.16,1,.3,1);
+      box-shadow: -8px 0 40px rgba(0,0,0,.25);
+    }
+    .sidepanel-overlay.open .sidepanel-box { transform: translateX(0); }
+    .sidepanel-title {
+      font-size: 1.05rem; font-weight: 800; margin-bottom: 18px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+
     /* ── Profile Modal ──────────────────────────────────── */
     .profile-header {
       display: flex; align-items: center; gap: 16px;
@@ -1266,6 +1282,21 @@
 </div>
 
 <!-- ══════════════════════════════════════════
+     SIDE PANEL — Navigate (slides in from the right)
+═══════════════════════════════════════════ -->
+<div class="sidepanel-overlay" id="navPanel" onclick="closeNavPanel(event)">
+  <div class="sidepanel-box" onclick="event.stopPropagation()">
+    <div class="sidepanel-title">
+      <span>🧭 Navigate</span>
+      <button class="btn-icon" onclick="closeNavPanel()" style="width:34px;height:34px;font-size:1rem">✕</button>
+    </div>
+    <a class="topnav-nav-link repost" href="repost.html">📌 Re:Post — Freedom Wall <span style="margin-left:auto;opacity:.6;font-size:.8rem">↗</span></a>
+    <a class="topnav-nav-link" href="relay.html">💬 Re:Lay — Messages <span style="margin-left:auto;opacity:.6;font-size:.8rem">↗</span></a>
+    <a class="topnav-nav-link" href="runner.html">🏃 Runner Portal <span style="margin-left:auto;opacity:.6;font-size:.8rem">↗</span></a>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
      PAGE: HOME
 ═══════════════════════════════════════════ -->
 <div class="page active" id="pageHome">
@@ -1278,7 +1309,7 @@
         🛒 Cart
         <div class="cart-count" id="cartCount">0</div>
       </button>
-      <a class="topnav-repost-btn" href="repost.html" title="Re:Post — Freedom Wall">📌 Re:Post</a>
+      <button class="btn-icon" onclick="openNavPanel()" title="Navigate">☰</button>
       <a class="btn-icon" href="relay.html" title="Messages">💬</a>
       <div class="avatar" id="homeAvatar" onclick="toggleProfile()" title="My Account">?</div>
     </div>
@@ -2468,13 +2499,6 @@ window.toggleProfile = function () {
       </label>
     </div>
 
-    <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
-      <div style="font-size:0.72rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Navigate</div>
-      <a class="topnav-nav-link repost" href="repost.html">📌 Re:Post — Freedom Wall <span style="margin-left:auto;opacity:.6;font-size:.8rem">↗</span></a>
-      <a class="topnav-nav-link" href="relay.html">💬 Re:Lay — Messages <span style="margin-left:auto;opacity:.6;font-size:.8rem">↗</span></a>
-      <a class="topnav-nav-link" href="runner.html">🏃 Runner Portal <span style="margin-left:auto;opacity:.6;font-size:.8rem">↗</span></a>
-    </div>
-
     <button class="btn btn-danger w-full" onclick="handleLogout()" style="border-radius:var(--radius-sm);padding:14px">
       🚪 Sign Out
     </button>
@@ -2587,6 +2611,16 @@ window.saveNickname = async function () {
 window.closeProfileModal = function (e) {
   if (!e || e.target === document.getElementById('profileModal')) {
     document.getElementById('profileModal').classList.remove('open');
+  }
+};
+
+window.openNavPanel = function () {
+  document.getElementById('navPanel').classList.add('open');
+};
+
+window.closeNavPanel = function (e) {
+  if (!e || e.target === document.getElementById('navPanel')) {
+    document.getElementById('navPanel').classList.remove('open');
   }
 };
 
