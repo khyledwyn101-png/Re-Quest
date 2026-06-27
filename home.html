@@ -820,6 +820,8 @@
     @keyframes avatarSpin { to { transform: rotate(360deg); } }
     .profile-name { font-size: 1.05rem; font-weight: 700; margin-bottom: 2px; }
     .profile-sub { font-size: 0.78rem; color: var(--muted); }
+    .profile-real-name { font-size: 0.74rem; color: var(--muted); margin-top: 1px; font-weight: 500; }
+    .nickname-edit-row { display: flex; gap: 8px; align-items: center; }
     .profile-info-list {
       display: flex; flex-direction: column; gap: 10px;
       background: var(--bg); border-radius: var(--radius-sm);
@@ -2262,7 +2264,7 @@ onAuthStateChanged(auth, async (user) => {
 
 /* ── Populate UI from user profile ────────────────────── */
 function populateUserUI() {
-  const name = userProfile?.fullName || currentUser.displayName || 'Student';
+  const name = userProfile?.nickname || userProfile?.fullName || currentUser.displayName || 'Student';
 
   // Avatar (photo if the student has uploaded one, initials otherwise)
   document.getElementById('homeAvatar').innerHTML = avatarInner(name, userProfile?.photoURL);
@@ -2279,7 +2281,7 @@ function populateUserUI() {
 function updateGreeting() {
   const h       = new Date().getHours();
   const tod     = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-  const first   = (userProfile?.fullName || currentUser?.displayName || '').split(' ')[0];
+  const first   = (userProfile?.nickname || userProfile?.fullName || currentUser?.displayName || '').split(' ')[0];
   const display = first ? `${tod}, ${first}! 👋` : `${tod} 👋`;
   const el      = document.getElementById('homeGreeting');
   if (el) el.textContent = display;
@@ -2388,7 +2390,9 @@ function avatarWrapHtml(name) {
 }
 
 window.toggleProfile = function () {
-  const name    = userProfile?.fullName || currentUser?.displayName || 'Student';
+  const fullName = userProfile?.fullName || currentUser?.displayName || 'Student';
+  const nickname = userProfile?.nickname || '';
+  const name     = nickname || fullName;   // what the avatar + header show
   const bio     = userProfile?.bio || '';
   const age     = calculateAge(userProfile?.birthdate);
   const isDark  = document.documentElement.getAttribute('data-theme') === 'dark';
@@ -2396,9 +2400,10 @@ window.toggleProfile = function () {
   document.getElementById('profileModalContent').innerHTML = `
     <div class="profile-header">
       ${avatarWrapHtml(name)}
-      <div>
-        <div class="profile-name">${name}</div>
-        <div class="profile-sub">${userProfile?.email || currentUser?.email || ''}</div>
+      <div style="min-width:0">
+        <div class="profile-name" id="profileDisplayName">${escapeHtml(name)}</div>
+        ${nickname ? `<div class="profile-real-name" id="profileRealName">@${escapeHtml(fullName)}</div>` : `<div class="profile-real-name hidden" id="profileRealName"></div>`}
+        <div class="profile-sub">${escapeHtml(userProfile?.email || currentUser?.email || '')}</div>
       </div>
     </div>
     <div class="profile-info-list">
@@ -2407,6 +2412,19 @@ window.toggleProfile = function () {
       ${userProfile?.course      ? `<div class="profile-info-row"><span class="profile-info-label">Course / Strand</span><span class="profile-info-val">${userProfile.course}</span></div>` : ''}
       ${userProfile?.yearLevel   ? `<div class="profile-info-row"><span class="profile-info-label">Year Level</span><span class="profile-info-val">${userProfile.yearLevel}</span></div>` : ''}
       ${userProfile?.section     ? `<div class="profile-info-row"><span class="profile-info-label">Section</span><span class="profile-info-val">${userProfile.section}</span></div>` : ''}
+    </div>
+
+    <div class="profile-bio-section">
+      <div class="profile-bio-label">✏️ Nickname</div>
+      <div class="nickname-edit-row">
+        <input class="form-input" id="nicknameInput" type="text"
+               value="${escapeHtml(nickname)}"
+               placeholder="${escapeHtml(fullName)}"
+               maxlength="30"
+               style="flex:1;padding:10px 13px;font-size:0.9rem" />
+        <button class="btn btn-primary profile-bio-save" id="nicknameSaveBtn" onclick="saveNickname()" style="white-space:nowrap">Save</button>
+      </div>
+      <div class="profile-bio-hint" style="margin-top:4px">Your real name stays as @${escapeHtml(fullName)}</div>
     </div>
 
     <div class="profile-bio-section">
@@ -2482,6 +2500,57 @@ window.saveBio = async function () {
     btn.disabled = false;
     btn.textContent = 'Save';
     showToast('Could not save your bio — try again', 'error');
+  }
+};
+
+// Saves a custom display name (nickname) to Firestore. The fullName
+// from signup is immutable — this just adds an optional alias that's
+// shown first wherever the user appears (profile header, chat, posts).
+window.saveNickname = async function () {
+  if (!currentUser) return;
+  const input    = document.getElementById('nicknameInput');
+  const btn      = document.getElementById('nicknameSaveBtn');
+  const nickname = input.value.trim();
+  const fullName = userProfile?.fullName || currentUser.displayName || 'Student';
+
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  try {
+    await setDoc(doc(db, 'users', currentUser.uid), { nickname: nickname || null }, { merge: true });
+    userProfile = { ...(userProfile || {}), nickname: nickname || null };
+
+    // Update profile header within the still-open modal
+    const displayName = nickname || fullName;
+    const nameEl = document.getElementById('profileDisplayName');
+    const realEl = document.getElementById('profileRealName');
+    if (nameEl) nameEl.textContent = displayName;
+    if (realEl) {
+      if (nickname) {
+        realEl.textContent = `@${fullName}`;
+        realEl.classList.remove('hidden');
+      } else {
+        realEl.textContent = '';
+        realEl.classList.add('hidden');
+      }
+    }
+
+    // Keep the nav-bar avatar in sync
+    document.getElementById('homeAvatar').innerHTML = avatarInner(displayName, userProfile?.photoURL);
+
+    btn.textContent = 'Saved ✓';
+    btn.classList.add('saved');
+    showToast('✓ Nickname updated', 'success');
+    setTimeout(() => {
+      btn.classList.remove('saved');
+      btn.textContent = 'Save';
+      btn.disabled = false;
+    }, 1400);
+  } catch (err) {
+    console.warn('Could not save nickname:', err);
+    btn.disabled = false;
+    btn.textContent = 'Save';
+    showToast('Could not save nickname — try again', 'error');
   }
 };
 

@@ -181,6 +181,7 @@
   }
   @keyframes avatarSpin { to { transform: rotate(360deg); } }
   .profile-name { font-size: 1.05rem; font-weight: 700; margin-bottom: 2px; }
+  .profile-real-name { font-size: 0.74rem; color: var(--muted); margin-top: 1px; font-weight: 500; }
   .profile-sub { font-size: 0.78rem; color: var(--muted); }
   .profile-info-list { display: flex; flex-direction: column; gap: 10px; background: var(--bg); border-radius: var(--radius-sm); padding: 14px 16px; margin: 14px 0; }
   .profile-info-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; gap: 10px; }
@@ -676,7 +677,7 @@ function showToast(msg, type = '') {
   toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
 }
 function populateAvatar() {
-  const name = userProfile?.fullName || currentUser?.displayName || 'User';
+  const name = userProfile?.nickname || userProfile?.fullName || currentUser?.displayName || 'User';
   const el = document.getElementById('relayAvatar');
   if (el) el.innerHTML = avatarInner(name, userProfile?.photoURL);
 }
@@ -734,14 +735,17 @@ function refreshAvatarWrap() {
 function renderMyProfileCard() {
   const el = document.getElementById('myProfileCard');
   if (!el) return;
-  const name     = userProfile?.fullName || currentUser?.displayName || 'Student';
+  const fullName    = userProfile?.fullName || currentUser?.displayName || 'Student';
+  const nickname    = userProfile?.nickname || '';
+  const displayName = nickname || fullName;
   const isRunner = userProfile?.role === 'runner';
 
   el.innerHTML = `
     <div class="flex items-center gap-3" style="margin-bottom:14px">
-      ${avatarWrapHtml(name)}
+      ${avatarWrapHtml(displayName)}
       <div style="min-width:0">
-        <div class="profile-name">${escapeHtml(name)}</div>
+        <div class="profile-name">${escapeHtml(displayName)}</div>
+        ${nickname ? `<div class="profile-real-name">@${escapeHtml(fullName)}</div>` : ''}
         <div class="profile-sub">${escapeHtml(userProfile?.email || currentUser?.email || '')}</div>
         <span class="badge ${isRunner ? 'badge-blue' : 'badge-gray'}" style="margin-top:6px">${isRunner ? '🏃 Runner' : '🎓 Student'}</span>
       </div>
@@ -836,7 +840,11 @@ window.handleUserSearch = function (e) {
   if (!q) { resultsEl.innerHTML = ''; return; }
 
   const matches = allUsersCache
-    .filter(u => u.fullName.toLowerCase().includes(q))
+    .filter(u => {
+      const q2 = q.toLowerCase();
+      return (u.fullName || '').toLowerCase().includes(q2) ||
+             (u.nickname || '').toLowerCase().includes(q2);
+    })
     .slice(0, 20);
 
   if (matches.length === 0) {
@@ -845,14 +853,16 @@ window.handleUserSearch = function (e) {
   }
 
   resultsEl.innerHTML = matches.map(u => {
-    const isRunner = u.role === 'runner';
-    const metaLine = [u.course, u.section, u.yearLevel].filter(Boolean).join(' · ');
+    const isRunner   = u.role === 'runner';
+    const displayName = u.nickname || u.fullName;
+    const metaLine   = [u.course, u.section, u.yearLevel].filter(Boolean).join(' · ');
     return `
       <div class="search-result-card">
         <div class="flex items-center gap-3">
-          <div class="profile-avatar-lg" style="width:42px;height:42px;font-size:0.95rem">${avatarInner(u.fullName, u.photoURL)}</div>
+          <div class="profile-avatar-lg" style="width:42px;height:42px;font-size:0.95rem">${avatarInner(displayName, u.photoURL)}</div>
           <div style="flex:1;min-width:0">
-            <div class="profile-name" style="font-size:0.9rem">${escapeHtml(u.fullName)}</div>
+            <div class="profile-name" style="font-size:0.9rem">${escapeHtml(displayName)}</div>
+            ${u.nickname ? `<div class="profile-real-name">@${escapeHtml(u.fullName)}</div>` : ''}
             ${metaLine ? `<div class="profile-sub">${escapeHtml(metaLine)}</div>` : ''}
           </div>
           <span class="badge ${isRunner ? 'badge-blue' : 'badge-gray'}">${isRunner ? 'Runner' : 'Student'}</span>
@@ -886,7 +896,11 @@ window.handleInlineSearch = function (e) {
   resultsEl.classList.remove('hidden');
 
   const matches = allUsersCache
-    .filter(u => u.fullName.toLowerCase().includes(q))
+    .filter(u => {
+      const q2 = q.toLowerCase();
+      return (u.fullName || '').toLowerCase().includes(q2) ||
+             (u.nickname || '').toLowerCase().includes(q2);
+    })
     .slice(0, 30);
 
   if (matches.length === 0) {
@@ -895,18 +909,19 @@ window.handleInlineSearch = function (e) {
   }
 
   resultsEl.innerHTML = matches.map(u => {
-    const isRunner = u.role === 'runner';
-    const metaLine = [u.course, u.section, u.yearLevel].filter(Boolean).join(' · ') || u.bio || 'Tap to message';
+    const isRunner    = u.role === 'runner';
+    const displayName = u.nickname || u.fullName;
+    const metaLine    = [u.course, u.section, u.yearLevel].filter(Boolean).join(' · ') || u.bio || 'Tap to message';
     return `
       <div class="conv-card" onclick="startConversationWith('${u.uid}')">
-        <div class="conv-avatar">${avatarInner(u.fullName, u.photoURL)}</div>
+        <div class="conv-avatar">${avatarInner(displayName, u.photoURL)}</div>
         <div class="conv-info">
           <div class="conv-name-row">
-            <span class="conv-name">${escapeHtml(u.fullName)}</span>
+            <span class="conv-name">${escapeHtml(displayName)}</span>
             <span class="badge ${isRunner ? 'badge-blue' : 'badge-gray'}" style="font-size:0.6rem">${isRunner ? 'Runner' : 'Student'}</span>
           </div>
           <div class="conv-preview-row">
-            <span class="conv-preview">${escapeHtml(metaLine)}</span>
+            <span class="conv-preview">${u.nickname ? `@${escapeHtml(u.fullName)}` : escapeHtml(metaLine)}</span>
           </div>
         </div>
       </div>`;
@@ -928,12 +943,12 @@ async function getOrCreateConversation(otherUser) {
   const snap = await getDoc(ref);
 
   if (!snap.exists()) {
-    const myName = userProfile?.fullName || currentUser.displayName || 'Student';
+    const myName = userProfile?.nickname || userProfile?.fullName || currentUser.displayName || 'Student';
     await setDoc(ref, {
       participants: [currentUser.uid, otherUser.uid].sort(),
       participantInfo: {
-        [currentUser.uid]: { fullName: myName, role: userProfile?.role || 'student', photoURL: userProfile?.photoURL || null },
-        [otherUser.uid]:   { fullName: otherUser.fullName, role: otherUser.role || 'student', photoURL: otherUser.photoURL || null }
+        [currentUser.uid]: { fullName: userProfile?.fullName || myName, nickname: userProfile?.nickname || null, role: userProfile?.role || 'student', photoURL: userProfile?.photoURL || null },
+        [otherUser.uid]:   { fullName: otherUser.fullName, nickname: otherUser.nickname || null, role: otherUser.role || 'student', photoURL: otherUser.photoURL || null }
       },
       lastMessage: null,
       lastMessageAt: serverTimestamp(),
@@ -985,16 +1000,17 @@ function renderDMList() {
   }
 
   el.innerHTML = list.map(c => {
-    const otherUid = c.participants.find(p => p !== currentUser.uid);
-    const other    = c.participantInfo?.[otherUid] || { fullName: 'Student' };
-    const unread   = c.unreadCount?.[currentUser.uid] || 0;
-    const preview  = c.lastMessage?.text || 'Say hello 👋';
+    const otherUid    = c.participants.find(p => p !== currentUser.uid);
+    const other       = c.participantInfo?.[otherUid] || { fullName: 'Student' };
+    const otherName   = other.nickname || other.fullName || 'Student';
+    const unread      = c.unreadCount?.[currentUser.uid] || 0;
+    const preview     = c.lastMessage?.text || 'Say hello 👋';
     return `
       <div class="conv-card ${c.id === activeConversationId ? 'active' : ''}" onclick="openConversation('${c.id}')">
-        <div class="conv-avatar">${avatarInner(other.fullName, other.photoURL)}</div>
+        <div class="conv-avatar">${avatarInner(otherName, other.photoURL)}</div>
         <div class="conv-info">
           <div class="conv-name-row">
-            <span class="conv-name">${escapeHtml(other.fullName)}</span>
+            <span class="conv-name">${escapeHtml(otherName)}</span>
             <span class="conv-time">${formatTimestamp(c.lastMessageAt)}</span>
           </div>
           <div class="conv-preview-row">
@@ -1016,13 +1032,14 @@ window.openConversation = function (cid) {
 
   const otherUid = convo.participants.find(p => p !== currentUser.uid);
   const other = convo.participantInfo?.[otherUid] || { fullName: 'Student' };
+  const otherName = other.nickname || other.fullName || 'Student';
 
   document.getElementById('deliveryOrderBar').innerHTML = '';
   document.getElementById('threadHeader').innerHTML = `
     <button class="btn-icon relay-thread-back" onclick="closeThread()">${backArrowSvg}</button>
-    <div class="conv-avatar">${avatarInner(other.fullName, other.photoURL)}</div>
+    <div class="conv-avatar">${avatarInner(otherName, other.photoURL)}</div>
     <div style="flex:1;min-width:0">
-      <div class="font-semibold" style="font-size:0.94rem">${escapeHtml(other.fullName)}</div>
+      <div class="font-semibold" style="font-size:0.94rem">${escapeHtml(otherName)}</div>
       <div class="text-xs text-muted">${other.role === 'runner' ? '🏃 Runner' : '🎓 Student'}</div>
     </div>
   `;
@@ -1043,7 +1060,7 @@ window.openConversation = function (cid) {
 async function sendDirectMessage(cid, text) {
   const convo = conversations.get(cid);
   const otherUid = convo.participants.find(p => p !== currentUser.uid);
-  const myName = userProfile?.fullName || currentUser.displayName || 'Student';
+  const myName = userProfile?.nickname || userProfile?.fullName || currentUser.displayName || 'Student';
 
   await addDoc(collection(db, 'conversations', cid, 'directMessages'), {
     text, senderId: currentUser.uid, senderName: myName, createdAt: serverTimestamp()

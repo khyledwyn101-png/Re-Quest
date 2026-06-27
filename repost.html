@@ -104,8 +104,22 @@ body {
   letter-spacing: 0.6px; opacity: 0.5; margin-bottom: 7px;
 }
 .card-text { font-size: 0.87rem; line-height: 1.55; word-break: break-word; }
-.card-foot { display: flex; align-items: center; justify-content: flex-end; margin-top: 9px; }
-.card-timer { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.3px; transition: color 0.5s; }
+.card-foot { display: flex; align-items: center; margin-top: 9px; }
+.card-timer { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.3px; transition: color 0.5s; margin-left: auto; }
+
+/* ── REMOVE BUTTON ────────────────────────── */
+.rm-post-btn {
+  font-size: 0.67rem; font-weight: 800; letter-spacing: 0.3px;
+  padding: 2px 8px; border-radius: 99px; border: 1.5px solid currentColor;
+  background: transparent; cursor: pointer; color: inherit; opacity: 0.3;
+  transition: opacity 0.15s, background 0.15s, color 0.15s, border-color 0.15s;
+  line-height: 1.5; white-space: nowrap; flex-shrink: 0;
+}
+.rm-post-btn:hover { opacity: 0.65; background: rgba(0,0,0,0.08); }
+.rm-post-btn.confirming {
+  opacity: 1 !important; color: #FC4C02 !important;
+  border-color: #FC4C02; background: rgba(252,76,2,0.12);
+}
 
 /* ── EMPTY / LOADING ──────────────────────────── */
 .empty, .ld { text-align: center; padding: 80px 20px; color: var(--muted); }
@@ -258,8 +272,10 @@ textarea.field { min-height: 88px; }
 <script type="module">
 import { initializeApp }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, query, where, orderBy, onSnapshot, Timestamp }
+import { getFirestore, collection, addDoc, deleteDoc, doc, getDoc, query, where, orderBy, onSnapshot, Timestamp }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAuth, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 /* ── Firebase ───────────────────────────── */
 const app = initializeApp({
@@ -270,7 +286,8 @@ const app = initializeApp({
   messagingSenderId: "189332484631",
   appId:             "G-J1K0VM2XGF"
 }, "repost-app");
-const db = getFirestore(app);
+const db   = getFirestore(app);
+const auth = getAuth(app);
 
 /* ── Constants ──────────────────────────── */
 const PER_PAGE = 12;
@@ -281,9 +298,18 @@ const ACCENTS  = ["#f59e0b","#ef4444","#3b82f6","#22c55e","#a855f7","#ec4899","#
 
 /* ── State ──────────────────────────────── */
 let allPosts = [], page = 0, imgData = null;
+let currentUser = null, userProfile = null;
+
+/* ── Role helpers ───────────────────────── */
+function isAdmin()    { return userProfile?.role === 'admin'; }
+function canRemove(p) {
+  if (!currentUser) return false;
+  if (isAdmin())    return true;
+  return !!(p.uid && p.uid === currentUser.uid);
+}
 
 /* ── Globals for inline handlers ────────── */
-Object.assign(window, { openModal, closeModal, overlayClick, pickImg, removeImg, submitPost, goPage, updateCount });
+Object.assign(window, { openModal, closeModal, overlayClick, pickImg, removeImg, submitPost, goPage, updateCount, removePost });
 
 /* ── Real-time feed (server-side 12h filter) */
 const cutoff = Timestamp.fromMillis(Date.now() - TTL_MS);
@@ -300,7 +326,22 @@ onSnapshot(
   err => { console.error(err); showToast("Connection error."); }
 );
 
-/* ── Render ─────────────────────────────── */
+/* ── Auth state ─────────────────────────── */
+onAuthStateChanged(auth, async (user) => {
+  currentUser = user;
+  if (user) {
+    try {
+      const snap = await getDoc(doc(db, 'users', user.uid));
+      userProfile = snap.exists() ? snap.data() : null;
+    } catch(e) { userProfile = null; }
+  } else {
+    userProfile = null;
+  }
+  syncNameInput();
+  render(); // refresh cards to show/hide remove buttons
+});
+
+
 function render() {
   const board = document.getElementById("board");
   const empty = document.getElementById("empty");
@@ -328,6 +369,16 @@ function buildCard(p) {
   const aut = esc(p.name || "Anonymous");
   const txt = esc(p.text || "");
   const img = p.image ? `<img class="card-img" src="${p.image}" loading="lazy" alt="">` : "";
+
+  // Remove button: visible to post owner or any admin
+  let rmBtn = '';
+  if (canRemove(p)) {
+    const adminForce = isAdmin() && !(p.uid && p.uid === currentUser?.uid);
+    const label = adminForce ? '🛡️ ✕' : '✕';
+    const title = adminForce ? 'Admin: remove this post' : 'Remove your post';
+    rmBtn = `<button class="rm-post-btn" onclick="event.stopPropagation();removePost('${p.id}',this)" title="${title}">${label}</button>`;
+  }
+
   return `
     <div class="card" data-id="${p.id}" style="background:${bg};color:${tx}">
       <div class="pin" style="background:${acc}"></div>
@@ -337,6 +388,7 @@ function buildCard(p) {
         <div class="card-author">📌 ${aut}</div>
         ${txt ? `<div class="card-text">${txt}</div>` : ""}
         <div class="card-foot">
+          ${rmBtn}
           <span class="card-timer" id="ct-${p.id}"></span>
         </div>
       </div>
@@ -374,7 +426,24 @@ function goPage(dir) {
 }
 
 /* ── Modal ──────────────────────────────── */
-function openModal()  { document.getElementById("overlay").classList.add("on"); }
+function syncNameInput() {
+  const nameInput = document.getElementById("pName");
+  if (!nameInput) return;
+  if (currentUser && userProfile) {
+    const autoName = userProfile.nickname || userProfile.fullName || '';
+    nameInput.value = autoName;
+    nameInput.placeholder = autoName
+      ? `Posting as ${autoName} — clear to post anonymously`
+      : 'Your name (optional — leave blank for Anonymous)';
+  } else {
+    nameInput.placeholder = 'Your name (optional — leave blank for Anonymous)';
+  }
+}
+
+function openModal()  {
+  document.getElementById("overlay").classList.add("on");
+  syncNameInput(); // re-fill after closeModal cleared it
+}
 function closeModal() {
   document.getElementById("overlay").classList.remove("on");
   ["pName","pText"].forEach(id => document.getElementById(id).value = "");
@@ -428,9 +497,10 @@ async function submitPost() {
   btn.textContent = "Posting…"; btn.disabled = true;
   try {
     await addDoc(collection(db, "repost_posts"), {
-      name:      name   || null,
-      text:      text   || null,
+      name:      name    || null,
+      text:      text    || null,
       image:     imgData || null,
+      uid:       currentUser?.uid || null,
       createdAt: Timestamp.now()
     });
     closeModal();
@@ -443,7 +513,37 @@ async function submitPost() {
   }
 }
 
-/* ── Helpers ────────────────────────────── */
+/* ── Remove post ─────────────────────────── */
+async function removePost(id, btn) {
+  if (btn.classList.contains('confirming')) {
+    // Second click — confirmed, proceed with deletion
+    clearTimeout(btn._revertTimer);
+    btn.textContent = '…';
+    btn.disabled = true;
+    try {
+      await deleteDoc(doc(db, 'repost_posts', id));
+      showToast('🗑️ Post removed.');
+    } catch(e) {
+      console.error(e);
+      showToast('Could not remove — try again.');
+      btn.disabled = false;
+      btn.classList.remove('confirming');
+      btn.textContent = btn.dataset.wasLabel || '✕';
+    }
+  } else {
+    // First click — enter confirmation state
+    const wasLabel = btn.textContent;
+    btn.dataset.wasLabel = wasLabel;
+    btn.classList.add('confirming');
+    btn.textContent = 'Remove?';
+    btn._revertTimer = setTimeout(() => {
+      btn.classList.remove('confirming');
+      btn.textContent = wasLabel;
+    }, 3000);
+  }
+}
+
+
 function esc(s) {
   return String(s)
     .replace(/&/g,"&amp;")
